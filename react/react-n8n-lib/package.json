@@ -1,0 +1,44 @@
+{
+    "name": "react-n8n-lib",
+    "version": "0.1.0",
+    "description": "React HOC library that fetches translations from an n8n webhook and injects t() and tt() helpers into class-based components. Composable with redux compose() and connect().",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "clean": "rimraf dist",
+        "build": "npm run clean && babel src --out-dir dist --copy-files",
+        "prepack": "npm run build",
+        "pack:local": "npm run build && npm pack"
+    },
+    "keywords": [
+        "react",
+        "n8n",
+        "i18n",
+        "translation",
+        "hoc",
+        "compose",
+        "connect",
+        "redux"
+    ],
+    "author": "",
+    "license": "MIT",
+    "peerDependencies": {
+        "react": ">=16.8.0"
+    },
+    "devDependencies": {
+        "@babel/cli": "^7.24.0",
+        "@babel/core": "^7.24.0",
+        "@babel/preset-env": "^7.24.0",
+        "@babel/preset-react": "^7.24.0",
+        "react": "^18.2.0",
+        "rimraf": "^5.0.5"
+    },
+    "dependencies": {
+        "hoist-non-react-statics": "^3.3.2"
+    }
+}
