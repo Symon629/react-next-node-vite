@@ -41,7 +41,7 @@
 import React from 'react';
 import hoistNonReactStatics from 'hoist-non-react-statics';
 import N8nContext from './n8nContext';
-import { makeT, makeTT } from './translate';
+import { makeT, makeTT, makeTExists } from './translate';
 
 /*
  * Helper for the displayName so React DevTools shows something useful like
@@ -62,6 +62,7 @@ function withN8nTranslation(options) {
     var opts = options || {};
     var tName = opts.propName || 't';
     var ttName = opts.templatedPropName || 'tt';
+    var tExistsName = opts.existsPropName || 'tExists';
 
     /*
      * Return a function (not the wrapped component directly) so the call site
@@ -80,6 +81,7 @@ function withN8nTranslation(options) {
                 this._cachedFor = null;
                 this._t = null;
                 this._tt = null;
+                this._tExists = null;
             }
 
             buildHelpers(translations) {
@@ -87,6 +89,7 @@ function withN8nTranslation(options) {
                     this._cachedFor = translations;
                     this._t = makeT(translations);
                     this._tt = makeTT(translations);
+                    this._tExists = makeTExists(translations);
                 }
             }
 
@@ -104,6 +107,7 @@ function withN8nTranslation(options) {
                             var injected = {};
                             injected[tName] = self._t;
                             injected[ttName] = self._tt;
+                            injected[tExistsName] = self._tExists;
                             injected.i18n = {
                                 locale: ctx.locale,
                                 loading: ctx.loading,

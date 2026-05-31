@@ -1,0 +1,26 @@
+/*
+ * brands/calvinKlein/config.js
+ */
+export default {
+    brandId: 'calvinKlein',
+    theme: {
+        primaryColor: '#000000',
+        accentColor: '#BFBFBF',
+        logoUrl: '/brands/calvinKlein/logo.svg',
+    },
+    auth: {
+        mfaEnabled: false,
+        twoFactorEnabled: true,
+        passwordMinLength: 8,
+    },
+    features: {
+        showSocialLogin: false,
+        showRememberMe: true,
+        showWishlist: true,
+        showLiveChat: true,
+    },
+    variations: {
+        loginLayout: 'centered',
+        ctaStyle: 'square',
+    },
+};

@@ -31,16 +31,42 @@ function interpolate(template, vars) {
     });
 }
 
+// Resolve a dotted path like "calvinKlein.heading" against an object.
+// Returns { found: boolean, value: any }.
+function resolvePath(source, key) {
+    if (!source || typeof key !== 'string' || key.length === 0) {
+        return { found: false, value: undefined };
+    }
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+        return { found: true, value: source[key] };
+    }
+    var parts = key.split('.');
+    var cursor = source;
+    for (var i = 0; i < parts.length; i++) {
+        if (
+            cursor != null &&
+            typeof cursor === 'object' &&
+            Object.prototype.hasOwnProperty.call(cursor, parts[i])
+        ) {
+            cursor = cursor[parts[i]];
+        } else {
+            return { found: false, value: undefined };
+        }
+    }
+    return { found: true, value: cursor };
+}
+
 /*
  * Builds the `t` function bound to a specific translations dictionary.
- * Curried this way so the HOC can re-create it only when the dictionary
- * changes (cheap referential-stability optimisation for PureComponent /
- * React.memo consumers).
+ * Supports dotted keys (e.g. "calvinKlein.heading"). Returns the resolved
+ * string, or the fallback (or the key) when the path is missing or the
+ * resolved value is not a string.
  */
 export function makeT(translations) {
     return function t(key, fallback) {
-        if (translations && Object.prototype.hasOwnProperty.call(translations, key)) {
-            return translations[key];
+        var hit = resolvePath(translations, key);
+        if (hit.found && typeof hit.value === 'string') {
+            return hit.value;
         }
         return typeof fallback === 'string' ? fallback : key;
     };
@@ -57,4 +83,15 @@ export function makeTT(translations) {
     };
 }
 
-export { interpolate };
+/*
+ * Builds the `tExists` function. Returns true only when the dotted path
+ * resolves to a defined, non-null value (string or otherwise).
+ */
+export function makeTExists(translations) {
+    return function tExists(key) {
+        var hit = resolvePath(translations, key);
+        return hit.found && hit.value != null;
+    };
+}
+
+export { interpolate, resolvePath };

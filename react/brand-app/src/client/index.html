@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brand App</title>
+    <!--
+      HtmlWebpackPlugin replaces <%= mybrandsScript %> below with an inline
+      <script>window.MYBRANDS = {...}</script> built from the local /brands
+      folder at build time. In production the Node BFF /serveRoot route can
+      replace this snapshot at request time with brand data resolved from
+      project metadata (env, host, etc.).
+    -->
+    <%= mybrandsScript %>
+</head>
+
+<body>
+    <div id="root"></div>
+</body>
+
+</html>

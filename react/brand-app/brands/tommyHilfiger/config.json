@@ -1,0 +1,23 @@
+{
+    "brandId": "tommyHilfiger",
+    "theme": {
+        "primaryColor": "#001F5B",
+        "accentColor": "#CE1126",
+        "logoUrl": "/brands/tommyHilfiger/logo.svg"
+    },
+    "auth": {
+        "mfaEnabled": true,
+        "twoFactorEnabled": false,
+        "passwordMinLength": 10
+    },
+    "features": {
+        "showSocialLogin": true,
+        "showRememberMe": true,
+        "showWishlist": true,
+        "showLiveChat": false
+    },
+    "variations": {
+        "loginLayout": "split",
+        "ctaStyle": "pill"
+    }
+}
