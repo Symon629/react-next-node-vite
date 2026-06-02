@@ -4,20 +4,58 @@ import React from 'react';
 // and crash at the bottom of this file with "connect is not a function".
 import { connect } from 'react-redux';
 import * as actions from '../../redux/actions';
+import { useNavigate } from 'react-router-dom';
+import requireAuth from '../utils/requireAuth';
+
+// useNavigate is a hook, so we read it in a function component and pass it
+// into the class component as a normal prop.
+
 
 // Export the UNCONNECTED class as a named export so tests can render
 // it directly without needing a Redux <Provider>. The default export
 // (further down) is still the connected version used by the app.
 export class CommentBox extends React.Component {
+
+
     constructor(props) {
         super(props);
         // `state` is a plain object that holds data this component owns.
         // Whenever state changes (via setState), React re-renders the component.
         this.state = { comment: '' };
 
+
         // ── Optional: bind once in the constructor instead of in render ──
         // this.handleChange = this.handleChange.bind(this);
         // this.handleSubmit = this.handleSubmit.bind(this);
+    }
+
+    // componentDidMount() lifecycle method is called by React immediately after a component is mounted (inserted into the tree) Meaning its get rendered for the first time. This is a good place to initiate API calls or set up subscriptions. If you need to load data from a remote endpoint, this is a good place to instantiate the network request
+    // This is a good place to initiate API calls or set up subscriptions. 
+
+    // component just rendered for the first time, 
+
+    componentDidMount() {
+        this.shouldNavigateAway();
+    }
+
+    // componentDidUpdate() lifecycle method is called by React immediately after updating occurs. This method is not called for the initial render. 
+    // This is a good place to perform network requests as long as you compare the current props to previous props (e.g. a network request may not be necessary if the props have not changed).
+    // so this will be called every time the component updates, which means every time the user types in the textarea, this method will be called. 
+    // We can use this method to check if the user is authenticated, and if not, we can navigate them away from the CommentBox component. This is a simple way to protect the CommentBox component from being accessed by unauthenticated users.
+    // even when the users parent component (App) re-renders, the CommentBox component will also re-render, which will trigger the componentDidUpdate method. 
+    // So if the user clicks the "Sign Out" button in the App component, which updates the auth state to false, the CommentBox component will re-render and trigger the componentDidUpdate method, which will then check if the user is authenticated and navigate them away if they are not.
+    componentDidUpdate() {
+        this.shouldNavigateAway();
+    }
+
+    shouldNavigateAway() {
+        if (!this.props.auth) {
+            // If the user is not authenticated, navigate them away from the CommentBox component. In this case, we will navigate them to the home page ("/") using the window.location object.
+            // 
+            if (this.props.navigate) {
+                this.props.navigate('/');
+            }
+        }
     }
 
     // Regular class methods are NOT automatically bound to the instance.
@@ -76,9 +114,12 @@ export class CommentBox extends React.Component {
     }
 }
 
+
+
 // the first argument to connect is mapStateToProps, which is a function that takes the Redux store state and maps it to props for the component.
 //  In this case, we don't need to map any state to props, so we pass null as the
-
+// Connect Redux first; this injects auth + action creators into CommentBox.
 // the second argument to connect is mapDispatchToProps, which is an object that contains action creators.
 //  The connect function will automatically bind these action creators to the dispatch function, so that when we call them in our component, they will dispatch the corresponding actions to the Redux store. In this case, we are passing all the action creators from the actions file, which means that all of our action creators will be available as props in the CommentBox component.
-export default connect(null, actions)(CommentBox);
+const ConnectedCommentBox = connect(null, actions)(requireAuth(CommentBox));
+export default ConnectedCommentBox;

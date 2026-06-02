@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import { mount } from "enzyme";
+import { MemoryRouter } from "react-router-dom";
 import CommentBox from "../CommentBox";
 import Root from "../../../Root";
 
@@ -27,13 +28,13 @@ import Root from "../../../Root";
 const saveComment = () => { };
 
 it("renders without crashing", () => {
-    render(<Root><CommentBox /></Root>);
+    render(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
     // getByText is a query method provided by React Testing Library that allows you to select elements based on their text content.    
     expect(screen.getByText("Comment")).toBeInTheDocument();
 });
 
 it("contains a textarea and a button", () => {
-    render(<Root><CommentBox /></Root>);
+    render(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
     // getByRole is a query method provided by React Testing Library that allows you to select elements based on their ARIA role. 
     // ARIA roles are attributes that define the purpose of an element in terms of accessibility.
     //  For example, a textarea has the role of "textbox" and a button has the role of "button".
@@ -56,10 +57,10 @@ beforeEach(() => {
     // tests from affecting each other and ensures a consistent starting
     // point for every test.
     document.body.innerHTML = '';
-    wrapper = mount(<Root><CommentBox /></Root>);
+    wrapper = mount(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
 });
 it("renders without crashing", () => {
-    mount(<Root><CommentBox /></Root>);
+    mount(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
 });
 
 it("contains a textarea and a button", () => {
@@ -89,7 +90,7 @@ it("updates the textarea value when user types (RTL)", () => {
     // We need to render the component first — earlier RTL tests rendered
     // their own copies and were torn down by `afterEach`/`document.body`
     // resets, so the DOM is empty at the start of this test.
-    render(<Root><CommentBox /></Root>);
+    render(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
 
     // Grab the textarea by its ARIA role ("textbox" covers <textarea>).
     const textarea = screen.getByRole("textbox");
@@ -168,7 +169,7 @@ it("updates the textarea value when user types", () => {
 // When form is submitted, the textarea should be cleared. We can test this behavior as well.
 
 it("clears the textarea when form is submitted (RTL)", () => {
-    render(<Root><CommentBox /></Root>);
+    render(<Root><MemoryRouter><CommentBox /></MemoryRouter></Root>);
     const textarea = screen.getByRole("textbox");
     // Two buttons exist; pick the submit button by its accessible name
     // so we trigger the form's onSubmit, not the unrelated "Fetch Comments".

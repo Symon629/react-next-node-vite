@@ -23,3 +23,10 @@ export function fetchComments() {
         payload: response
     };
 }
+
+export function changeAuth(isAuthenticated) {
+    return {
+        type: CHANGE_AUTH,
+        payload: isAuthenticated
+    };
+}

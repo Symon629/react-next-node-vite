@@ -1,10 +1,15 @@
-import { combineReducers, createStore } from "redux";
-import commentsReducer from "./comments";
+import { combineReducers, createStore, applyMiddleware } from "redux";
+import commentsReducer from "./reducers/comments";
+import authReducer from "./reducers/auth";
+import reduxPromise from "redux-promise";
+
 
 const rootReducer = combineReducers({
-    comments: commentsReducer
+    comments: commentsReducer,
+    auth: authReducer
 });
 
-const store = createStore(rootReducer, {});
+const initialState = {};
+const store = createStore(rootReducer, initialState, applyMiddleware(reduxPromise));
 
 export default store;
