@@ -1,6 +1,6 @@
 import { Provider } from 'react-redux';
 import { combineReducers, createStore, applyMiddleware } from 'redux';
-import commentsReducer from './redux/comments';
+import commentsReducer from './redux/reducers/comments';
 import React from 'react';
 import reduxPromise from "redux-promise";
 

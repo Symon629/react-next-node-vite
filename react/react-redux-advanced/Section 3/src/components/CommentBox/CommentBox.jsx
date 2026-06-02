@@ -66,7 +66,7 @@ export class CommentBox extends React.Component {
                     <button type="submit">Submit Comment</button>
                 </div>
                 <div>
-                    // Here we are rendering a button that, when clicked, will call the fetchComments action creator, which is available as a prop because of the connect function at the bottom of this file. The fetchComments action creator will dispatch an action to the Redux store, which will then update the state with the fetched comments.
+                    {/* // Here we are rendering a button that, when clicked, will call the fetchComments action creator, which is available as a prop because of the connect function at the bottom of this file. The fetchComments action creator will dispatch an action to the Redux store, which will then update the state with the fetched comments. */}
                     <button className="fetch-comments" type="button" onClick={this.props.fetchComments}>
                         Fetch Comments
                     </button>
