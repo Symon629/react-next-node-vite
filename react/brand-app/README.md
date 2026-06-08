@@ -89,6 +89,80 @@ npm run build
 npm start                       # node dist/server/index.js, http://localhost:4000/serveRoot
 ```
 
+## Step-by-step: run it locally end to end
+
+The app depends on the sibling [`react-n8n-lib`](../react-n8n-lib) package
+via a `file:` reference. You need to build the library at least once before
+the brand app can resolve it.
+
+### 1. Build the library
+
+```bash
+cd react-n8n-lib
+npm install
+npm run build          # produces dist/ via Babel
+```
+
+### 2. Install the brand app
+
+```bash
+cd ../brand-app
+npm install            # pulls in the freshly built react-n8n-lib via file:../react-n8n-lib
+```
+
+### 3. Run the dev environment
+
+```bash
+npm run dev
+```
+
+This starts two processes:
+
+- **webpack-dev-server** on `http://localhost:3000` — bundles the client
+  with HMR and inlines `window.MYBRANDS` from disk via `HtmlWebpackPlugin`.
+- **Express BFF (ts-node-dev)** on `http://localhost:4000` — exposes
+  `GET /serveRoot` (the same HTML, but with `window.MYBRANDS` re-injected
+  per request from `brand-app/brands/`).
+
+Open either:
+
+- `http://localhost:3000/` for the dev-server build (auto-reloads).
+- `http://localhost:4000/serveRoot` for the BFF-rendered version (matches
+  production behaviour).
+
+### 4. Build for production and serve from the BFF
+
+```bash
+npm run build          # client → dist/public, server → dist/server
+npm start              # node dist/server/index.js
+```
+
+Then visit `http://localhost:4000/serveRoot`.
+
+### 5. Switch / edit brands
+
+- Click the brand buttons in the page header to dispatch
+  `brandActions.setActive(...)` at runtime.
+- Edit `brands/<id>/strings.json` or `brands/<id>/config.json` and reload
+  the BFF route — it re-reads the folder on every request in development.
+
+## Local-only mode (no GitHub poller)
+
+By default the brand store **does not** make any external network calls. The
+flow is:
+
+1. `HtmlWebpackPlugin` reads `brand-app/brands/` at build time and inlines
+   `window.MYBRANDS` into the HTML.
+2. The BFF re-injects the same shape per request from disk via `/serveRoot`.
+3. `initBrandsStore()` in `src/client/store.ts` reads that snapshot.
+4. `GITHUB_MANIFEST_URL` in `src/client/store.ts` is `undefined`, so the
+   poller in `react-n8n-lib` is never constructed and no `fetch` is issued
+   for brand data.
+
+To opt **in** to live polling for a deployed environment, set
+`GITHUB_MANIFEST_URL` in [`src/client/store.ts`](./src/client/store.ts) to
+your raw manifest URL (or wire it through webpack's `DefinePlugin`).
+
 ## Updating brands
 
 Edit any of:
@@ -99,9 +173,8 @@ Edit any of:
 
 In dev these are hot — the BFF re-reads them on every `/serveRoot` request.
 In prod, the BFF caches the snapshot at boot; restart the server to pick up
-changes. The optional GitHub poller in `react-n8n-lib` lets you push updates
-without redeploying — point `manifestUrl` (in `src/client/store.ts`) at your
-GitHub raw URL.
+changes. Live polling (when enabled — see "Local-only mode" above) lets you
+push updates without redeploying.
 
 ## HOC composition
 
@@ -120,3 +193,5 @@ compose(
 
 Both HOCs are class-based and store DOM refs on the instance, so typing into
 inputs never re-renders the component tree — only validation and submit do.
+See [`src/client/hocs/README.md`](./src/client/hocs/README.md) for the full
+HOC API (binders, lifecycle hooks, error flow).

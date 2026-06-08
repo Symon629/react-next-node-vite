@@ -44,9 +44,15 @@ export const minLength = (n: number): ValidatorFn =>
 /* ---- HOC --------------------------------------------------------------- */
 
 export interface WithValidationProps extends WithFormProps {
+    /**
+     * Wraps a consumer's onValidSubmit and registers it as the form's
+     * onBeforeSubmit hook. Returns the same handler so it can be used as
+     * a manual submit callback if desired. Validation runs against the
+     * live values gathered from the form ref.
+     */
     validateAndSubmit: (
         onValidSubmit: (values: FieldValues) => void | Promise<void>
-    ) => (e: React.FormEvent<HTMLFormElement>) => void;
+    ) => (values: FieldValues) => Promise<void>;
 }
 
 function getDisplayName<P>(C: React.ComponentType<P>): string {
@@ -87,16 +93,19 @@ export function withValidation(rules: ValidationRules) {
 
             private validateAndSubmit = (
                 onValidSubmit: (values: FieldValues) => void | Promise<void>
-            ) => (e: React.FormEvent<HTMLFormElement>) => {
-                e.preventDefault();
-                const values = this.props.form.getValues();
-                const errs = this.runRules(values);
-                if (errs) {
-                    this.props.form.setErrors(errs);
-                    return;
-                }
-                this.props.form.setErrors({});
-                Promise.resolve(onValidSubmit(values)).catch(() => { /* consumer owns errors */ });
+            ) => {
+                const handler = async (values: FieldValues): Promise<void> => {
+                    const errs = this.runRules(values);
+                    if (errs) {
+                        this.props.form.setErrors(errs);
+                        // Throwing aborts the bindForm submit chain in withForm.
+                        throw new Error('validation_failed');
+                    }
+                    this.props.form.setErrors({});
+                    await onValidSubmit(values);
+                };
+                this.props.form.setOnBeforeSubmitFn(handler);
+                return handler;
             };
 
             render() {

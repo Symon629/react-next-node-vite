@@ -42,20 +42,25 @@ class LoginFormImpl extends React.Component<Props> {
         alert('Submitting:\n' + JSON.stringify(values, null, 2));
     };
 
+    componentDidMount() {
+        // Register validation as the before-submit hook. bindForm() handles
+        // the actual submit event, so we no longer wire onSubmit manually.
+        this.props.validateAndSubmit(this.onValidSubmit);
+    }
+
     render() {
-        const { strings, config, form, validateAndSubmit } = this.props;
+        const { strings, config, form } = this.props;
         const ctaShape = config.variations?.ctaStyle === 'square' ? 0 : 999;
         const accent = config.theme?.primaryColor || '#111';
 
         return (
-            <form onSubmit={validateAndSubmit(this.onValidSubmit)} noValidate>
+            <form {...form.bindForm()} noValidate>
                 <h2>{strings['login.welcome'] ?? 'Welcome'}</h2>
 
                 <label style={{ display: 'block', marginBottom: 12 }}>
                     {strings['form.email.label'] ?? 'Email'}
                     <input
-                        ref={form.register('email')}
-                        defaultValue={form.values.email ?? ''}
+                        {...form.bindInput('email')}
                         type="email"
                         autoComplete="username"
                         style={{ display: 'block', width: '100%' }}
@@ -68,7 +73,7 @@ class LoginFormImpl extends React.Component<Props> {
                 <label style={{ display: 'block', marginBottom: 12 }}>
                     {strings['form.password.label'] ?? 'Password'}
                     <input
-                        ref={form.register('password')}
+                        {...form.bindInput('password')}
                         type="password"
                         autoComplete="current-password"
                         style={{ display: 'block', width: '100%' }}
@@ -82,7 +87,7 @@ class LoginFormImpl extends React.Component<Props> {
                     <label style={{ display: 'block', marginBottom: 12 }}>
                         {strings['login.mfa.prompt'] ?? 'MFA code'}
                         <input
-                            ref={form.register('mfaCode')}
+                            {...form.bindInput('mfaCode')}
                             type="text"
                             inputMode="numeric"
                             style={{ display: 'block', width: '100%' }}
@@ -94,7 +99,7 @@ class LoginFormImpl extends React.Component<Props> {
                     <label style={{ display: 'block', marginBottom: 12 }}>
                         {strings['login.2fa.prompt'] ?? '2FA code'}
                         <input
-                            ref={form.register('twoFactorCode')}
+                            {...form.bindInput('twoFactorCode')}
                             type="text"
                             inputMode="numeric"
                             style={{ display: 'block', width: '100%' }}

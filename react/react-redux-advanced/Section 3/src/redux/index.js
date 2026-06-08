@@ -2,6 +2,7 @@ import { combineReducers, createStore, applyMiddleware } from "redux";
 import commentsReducer from "./reducers/comments";
 import authReducer from "./reducers/auth";
 import reduxPromise from "redux-promise";
+import async from "./middleware/async";
 
 
 const rootReducer = combineReducers({
@@ -10,6 +11,6 @@ const rootReducer = combineReducers({
 });
 
 const initialState = {};
-const store = createStore(rootReducer, initialState, applyMiddleware(reduxPromise));
+const store = createStore(rootReducer, initialState, applyMiddleware(async));
 
 export default store;

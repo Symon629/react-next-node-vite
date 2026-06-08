@@ -1,53 +1,66 @@
 /*
  * src/client/hocs/withForm.tsx
  * ---------------------------------------------------------------------------
- * Class-based HOC that turns the wrapped component into a "form host". It
- * uses uncontrolled inputs and gathers their values via refs registered by
- * the wrapped component, so consumers can keep their JSX simple.
+ * Redux-connected, class-based form HOC. The wrapped component renders the
+ * form markup and uses three binders exposed on `this.props.form`:
  *
- *   class LoginForm extends React.Component<WithFormProps> {
- *     render() {
- *       const { register, handleSubmit, values, errors } = this.props.form;
- *       return (
- *         <form onSubmit={handleSubmit(this.onSubmit)}>
- *           <input ref={register('email')}    defaultValue={values.email} />
- *           <input ref={register('password')} type="password" />
- *           <button type="submit">Submit</button>
- *         </form>
- *       );
- *     }
- *     onSubmit = (values: Record<string, string>) => { ... };
- *   }
+ *   bindForm()          → props for the <form> element (ref + onSubmit)
+ *   bindInput(name)     → props for each <input>/<select>/<textarea>
+ *   submitForm()        → imperative submit (also runs onBeforeSubmitFn)
  *
- *   export default withForm({ initialValues: { email: '' } })(LoginForm);
+ * On mount the HOC walks the form ref to discover field names, picks the
+ * matching slice from the redux `form` prop, and dispatches
+ * FORM_UNVALIDATE.MERGE_INTO_FORM so the redux form slice is seeded from
+ * whatever the consumer passed in. It then scrolls to the top of the page.
  *
- * The HOC stores ALL field refs in a class instance Map (no React state), so
- * typing into an input never triggers a re-render. State changes only happen
- * on submit (or when withValidation, layered above, decides to surface
- * errors).
+ * The wrapped component can register lifecycle callbacks via:
+ *
+ *   this.props.form.setOnFormStartFn(fn)     // called once on first edit
+ *   this.props.form.setOnBeforeSubmitFn(fn)  // called before submit fires
+ *
+ * The original `onSubmit` (if provided as a prop) is invoked at the end of
+ * `bindForm`'s submit handler with the gathered field values.
  * ---------------------------------------------------------------------------
  */
 
 import React from 'react';
+import { connect } from 'react-redux';
 
-export type FieldRefMap = Map<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>;
 export type FieldValues = Record<string, string>;
 export type FieldErrors = Record<string, string | undefined>;
 
+/* ---- redux action constants -------------------------------------------- */
+
+export const FORM_UNVALIDATE = {
+    MERGE_INTO_FORM: 'FORM_UNVALIDATE/MERGE_INTO_FORM' as const,
+};
+
+/* ---- form API exposed to the wrapped component ------------------------- */
+
+export interface FormBindings {
+    ref: React.RefObject<HTMLFormElement>;
+    onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+}
+
+export interface InputBindings {
+    name: string;
+    defaultValue: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+}
+
 export interface FormApi {
-    register: (name: string) => React.RefCallback<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
-    /** Read all current input values (live from the DOM). */
+    bindForm: () => FormBindings;
+    bindInput: (name: string) => InputBindings;
+    submitForm: () => void;
+    setOnFormStartFn: (fn: () => void) => void;
+    setOnBeforeSubmitFn: (fn: (values: FieldValues) => void | Promise<void>) => void;
+    /** Snapshot of values gathered from the form ref. */
     getValues: () => FieldValues;
-    /** Wraps a submit handler so it receives the gathered values map. */
-    handleSubmit: (
-        onSubmit: (values: FieldValues) => void | Promise<void>
-    ) => (e: React.FormEvent<HTMLFormElement>) => void;
-    /** Initial values supplied to the HOC (consumers use them as defaultValue). */
-    values: FieldValues;
     /** Errors surfaced by withValidation (empty if not composed). */
     errors: FieldErrors;
-    /** Imperatively set/clear errors from the consumer if needed. */
     setErrors: (errors: FieldErrors) => void;
+    /** Initial values supplied to the HOC. */
+    values: FieldValues;
 }
 
 export interface WithFormProps {
@@ -58,78 +71,179 @@ export interface WithFormOptions {
     initialValues?: FieldValues;
 }
 
+/* Extra props the HOC consumes from the wrapper / redux. */
+interface InjectedProps {
+    dispatch: (action: { type: string; model?: FieldValues }) => void;
+    form?: FieldValues;
+    onSubmit?: (values: FieldValues) => void | Promise<void>;
+}
+
 interface WithFormState {
     errors: FieldErrors;
 }
 
+/* ---- helpers ----------------------------------------------------------- */
+
 function getDisplayName<P>(C: React.ComponentType<P>): string {
     return C.displayName || C.name || 'Component';
 }
+
+function getFieldNamesFromRef(formEl: HTMLFormElement | null): string[] {
+    if (!formEl) return [];
+    const names = new Set<string>();
+    const elements = formEl.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input[name], textarea[name], select[name]'
+    );
+    elements.forEach((el) => { if (el.name) names.add(el.name); });
+    return Array.from(names);
+}
+
+function pick<T extends Record<string, unknown>>(src: T | undefined, keys: string[]): FieldValues {
+    const out: FieldValues = {};
+    if (!src) return out;
+    for (const k of keys) {
+        const v = src[k];
+        if (v !== undefined) out[k] = String(v);
+    }
+    return out;
+}
+
+function scrollUp(): void {
+    if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+}
+
+/* ---- HOC --------------------------------------------------------------- */
 
 export function withForm(options: WithFormOptions = {}) {
     const initialValues = options.initialValues || {};
 
     return function wrap<P extends WithFormProps>(
         Component: React.ComponentType<P>
-    ): React.ComponentClass<Omit<P, keyof WithFormProps>> {
+    ): React.ComponentType<Omit<P, keyof WithFormProps> & { onSubmit?: (values: FieldValues) => void | Promise<void> }> {
 
-        class WithForm extends React.Component<Omit<P, keyof WithFormProps>, WithFormState> {
+        type IncomingProps = Omit<P, keyof WithFormProps> & InjectedProps;
+
+        class WithForm extends React.Component<IncomingProps, WithFormState> {
             static displayName = `withForm(${getDisplayName(Component)})`;
 
-            // Refs live on the instance, NOT in state — no re-renders on keystroke.
-            private fieldRefs: FieldRefMap = new Map();
+            private formRef: React.RefObject<HTMLFormElement> = React.createRef();
+            private formStarted = false;
+            private onFormStartFn: (() => void) | null = null;
+            private onBeforeSubmitFn: ((values: FieldValues) => void | Promise<void>) | null = null;
 
             state: WithFormState = { errors: {} };
 
-            private register = (name: string): React.RefCallback<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> => {
-                return (el) => {
-                    if (el) this.fieldRefs.set(name, el);
-                    else this.fieldRefs.delete(name);
-                };
+            componentDidMount(): void {
+                const { dispatch, form } = this.props;
+                const fieldNames = getFieldNamesFromRef(this.formRef.current);
+                const model = pick(form as Record<string, unknown> | undefined, fieldNames);
+                dispatch({ type: FORM_UNVALIDATE.MERGE_INTO_FORM, model });
+                scrollUp();
+            }
+
+            /* --- callback setters available to the wrapped component ---- */
+
+            private setOnFormStartFn = (fn: () => void): void => {
+                this.onFormStartFn = fn;
             };
 
+            private setOnBeforeSubmitFn = (
+                fn: (values: FieldValues) => void | Promise<void>
+            ): void => {
+                this.onBeforeSubmitFn = fn;
+            };
+
+            /* --- value gathering ---------------------------------------- */
+
             private getValues = (): FieldValues => {
-                const out: FieldValues = {};
-                this.fieldRefs.forEach((el, name) => {
-                    out[name] = el ? (el as HTMLInputElement).value : '';
-                });
-                // Include any initialValues that haven't been registered yet so
-                // consumers always see a complete shape on submit.
-                Object.keys(initialValues).forEach((k) => {
-                    if (!(k in out)) out[k] = initialValues[k];
-                });
+                const out: FieldValues = { ...initialValues };
+                const formEl = this.formRef.current;
+                if (!formEl) return out;
+                const elements = formEl.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+                    'input[name], textarea[name], select[name]'
+                );
+                elements.forEach((el) => { if (el.name) out[el.name] = el.value; });
                 return out;
             };
 
-            private setErrors = (errors: FieldErrors) => {
+            private setErrors = (errors: FieldErrors): void => {
                 this.setState({ errors });
             };
 
-            private handleSubmit = (
-                onSubmit: (values: FieldValues) => void | Promise<void>
-            ) => (e: React.FormEvent<HTMLFormElement>) => {
+            /* --- binders ------------------------------------------------ */
+
+            private handleInputChange = (): void => {
+                if (!this.formStarted) {
+                    this.formStarted = true;
+                    if (this.onFormStartFn) this.onFormStartFn();
+                }
+            };
+
+            private bindInput = (name: string): InputBindings => ({
+                name,
+                defaultValue: initialValues[name] ?? '',
+                onChange: this.handleInputChange,
+            });
+
+            private bindForm = (): FormBindings => ({
+                ref: this.formRef,
+                onSubmit: this.handleFormSubmit,
+            });
+
+            private handleFormSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
                 e.preventDefault();
                 const values = this.getValues();
-                Promise.resolve(onSubmit(values)).catch(() => { /* consumer owns errors */ });
+                const { onSubmit } = this.props;
+                Promise.resolve(this.onBeforeSubmitFn ? this.onBeforeSubmitFn(values) : undefined)
+                    .then(() => (onSubmit ? onSubmit(values) : undefined))
+                    .catch(() => { /* consumer owns errors */ });
+            };
+
+            private submitForm = (): void => {
+                const values = this.getValues();
+                const { onSubmit } = this.props;
+                Promise.resolve(this.onBeforeSubmitFn ? this.onBeforeSubmitFn(values) : undefined)
+                    .then(() => (onSubmit ? onSubmit(values) : undefined))
+                    .catch(() => { /* consumer owns errors */ });
             };
 
             render() {
                 const formApi: FormApi = {
-                    register: this.register,
+                    bindForm: this.bindForm,
+                    bindInput: this.bindInput,
+                    submitForm: this.submitForm,
+                    setOnFormStartFn: this.setOnFormStartFn,
+                    setOnBeforeSubmitFn: this.setOnBeforeSubmitFn,
                     getValues: this.getValues,
-                    handleSubmit: this.handleSubmit,
-                    values: initialValues,
                     errors: this.state.errors,
                     setErrors: this.setErrors,
+                    values: initialValues,
                 };
+
+                // Strip HOC-only props before forwarding to the wrapped component.
+                const { dispatch: _d, form: _f, onSubmit: _s, ...rest } = this.props as IncomingProps;
+                void _d; void _f; void _s;
+
                 return React.createElement(
-                    Component as React.ComponentType<WithFormProps & typeof this.props>,
-                    Object.assign({}, this.props, { form: formApi }) as never
+                    Component as React.ComponentType<WithFormProps & Omit<P, keyof WithFormProps>>,
+                    Object.assign({}, rest, { form: formApi }) as never
                 );
             }
         }
 
-        return WithForm;
+        // Connect to redux so the HOC has `dispatch` and the `form` slice.
+        // Consumers of the wrapped component pass only their own props; redux
+        // injects the rest. The cast through `any` is intentional — react-redux's
+        // generic inference can't reconcile the HOC's `IncomingProps` shape.
+        const Connected = (connect(
+            (state: { form?: FieldValues }) => ({ form: state.form })
+        ) as unknown as (c: React.ComponentType<IncomingProps>) => React.ComponentType<Omit<IncomingProps, keyof InjectedProps> & { onSubmit?: (values: FieldValues) => void | Promise<void> }>)(WithForm);
+
+        return Connected as unknown as React.ComponentType<
+            Omit<P, keyof WithFormProps> & { onSubmit?: (values: FieldValues) => void | Promise<void> }
+        >;
     };
 }
 

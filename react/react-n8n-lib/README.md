@@ -13,6 +13,9 @@ A small React library with two cooperating subsystems:
 Both subsystems are designed to plug into Redux's `compose()` / `connect()`
 chain and to work side-by-side without depending on each other.
 
+> Looking for the per-HOC API (props, lifecycle, options)? See
+> [`src/HOCs.md`](./src/HOCs.md).
+
 ## n8n translation HOC props
 
 | Prop | Signature | Purpose |
